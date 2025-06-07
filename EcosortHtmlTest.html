@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoSort - Waste Classification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f0f4f0;
+        }
+        .container {
+            background-color: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        #video, #webcam {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            border-radius: 10px;
+        }
+        #captureBtn, #submitBtn, .btn {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        #captureBtn:hover, #submitBtn:hover, .btn:hover {
+            background-color: #45a049;
+        }
+        #preview {
+            max-width: 224px;
+            max-height: 224px;
+            margin: 10px auto;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            display: none;
+        }
+        #responseText {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .game-section {
+            margin-top: 20px;
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .error {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .success {
+            color: #388e3c;
+            background-color: #e8f5e9;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EcoSort - Waste Classification</h1>
+        
+        <!-- File Upload Section -->
+        <form id="uploadForm" enctype="multipart/form-data">
+            <label for="fileInput">Upload an Image:</label>
+            <input type="file" id="fileInput" name="image" accept="image/*" required>
+            <button type="button" id="submitBtn">Upload</button>
+        </form>
+
+        <!-- Camera Capture Section -->
+        <h2>Or Use Camera</h2>
+        <div id="cameraContainer">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="canvas" width="224" height="224" style="display: none;"></canvas>
+            <button type="button" id="captureBtn">Capture and Upload</button>
+        </div>
+
+        <!-- Preview Section -->
+        <h2>Preview</h2>
+        <img id="preview" alt="Preview will appear here">
+
+        <!-- Response Section -->
+        <div id="responseText"></div>
+
+        <!-- Game Section -->
+        <div class="game-section">
+            <h3>Waste Classification Game</h3>
+            <p id="random-word">YOUR WORD IS ...</p>
+            <p id="points-text">POINTS: 0</p>
+        </div>
+    </div>
+
+    <script>
+        // Camera and Webcam Setup
+        const webcam = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const preview = document.getElementById('preview');
+        const fileInput = document.getElementById('fileInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const responseText = document.getElementById('responseText');
+
+        // Game Variables
+        const words = ["PLASTIC", "METAL", "GLASS", "CARDBOARD", "PAPER"];
+        let points = localStorage.getItem('points') ? parseInt(localStorage.getItem('points')) : 0;
+        const pointsText = document.getElementById("points-text");
+        pointsText.innerText = `POINTS: ${points}`;
+        let randomWord = generateRandomWord();
+        document.getElementById("random-word").innerText = `YOUR WORD IS ${randomWord}`;
+
+        // Start the live camera feed with constraints
+        async function initCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        width: { ideal: 224 },
+                        height: { ideal: 224 },
+                        facingMode: 'environment'
+                    }
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                webcam.srcObject = stream;
+                return true;
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                responseText.innerHTML = '<div class="error">Camera access denied or not available.</div>';
+                return false;
+            }
+        }
+
+        // Initialize camera on page load
+        initCamera();
+
+        function generateRandomWord() {
+            return words[Math.floor(Math.random() * words.length)];
+        }
+
+        // Function to upload image
+        async function uploadImage(blob, filename) {
+            // Show loading state
+            responseText.innerHTML = '<div class="info">Processing image...</div>';
+            
+            const formData = new FormData();
+            formData.append('image', blob, filename);
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || `Server error: ${response.status}`);
+                }
+                
+                if (result.class) {
+                    // Display result with styling
+                    responseText.innerHTML = `
+                        <div class="success">
+                            <p>Detected Waste Type: <strong>${result.class.toUpperCase()}</strong></p>
+                            <p>Certainty: ${result.certainty.toFixed(2)}%</p>
+                        </div>
+                    `;
+
+                    // Game logic
+                    if (result.class.toUpperCase() === randomWord) {
+                        points += 1;
+                        pointsText.innerText = `POINTS: ${points}`;
+                        localStorage.setItem('points', points);
+                        randomWord = generateRandomWord();
+                        document.getElementById("random-word").innerText = `YOUR WORD IS ${randomWord}`;
+                        alert(`Correct! You earned a point!\nCurrent Points: ${points}`);
+                    }
+                } else {
+                    responseText.innerHTML = `<div class="error">Unable to classify the image.</div>`;
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                responseText.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Handle camera capture
+        document.getElementById('captureBtn').addEventListener('click', () => {
+            context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+            preview.style.display = 'block';
+            preview.src = canvas.toDataURL('image/jpeg', 0.9);
+
+            canvas.toBlob((blob) => {
+                uploadImage(blob, 'capture.jpg');
+            }, 'image/jpeg', 0.9);
+        });
+
+        // Handle file upload
+        submitBtn.addEventListener('click', () => {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.style.display = 'block';
+                    preview.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                uploadImage(file, file.name);
+            } else {
+                responseText.innerHTML = '<div class="error">Please select an image first.</div>';
+            }
+        });
+
+        // Handle file input change
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.style.display = 'block';
+                    preview.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    </script>
+</body>
+</html>

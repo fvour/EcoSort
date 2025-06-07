@@ -1,0 +1,4 @@
+Drive: https://drive.google.com/drive/u/2/folders/1Y79szQWxeTr9MN_Xqy_qemdJqmfWd5R4
+Model V1 V2: https://colab.research.google.com/drive/1fSPIBMKskaxYsEOLtXZP9nK7i0LN5x6N?authuser=2#scrollTo=MBpL1wSJryXX 
+Model V3 V4: https://colab.research.google.com/drive/1Xq0V50D4q0h3dLkE7aDJ3FaLS0rSF23C?authuser=2 
+Flask: https://colab.research.google.com/drive/1vHC0gNRAHDJDsdkOvXN4qZJhl1M_KS1l?authuser=2 

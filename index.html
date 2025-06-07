@@ -1,0 +1,138 @@
+<!-- In index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Background Website</title>
+    <link rel="stylesheet" href="../CSS/index.css">
+</head>
+<body>
+    <video autoplay muted loop id="background-video">
+        <source src="../ASSETS/1217.mp4" type="video/mp4">
+    </video>
+    <div class="content">
+        <h1>ECOSORT</h1>
+        <p>EST. 2024</p>
+        <a href="#next-section" class="down-arrow">
+            <img src="../ASSETS/down-arrow.png" alt="Down Arrow" />
+        </a>
+    </div>
+    <div class="black-background" id="next-section">
+        <ul class="text-list">
+            <!-- Add points as a query parameter to the store link -->
+            <li><a href="store.html"><button class="btn">STORE</button></a></li>
+            <li><button class="btn btn-play">PLAY</button></li>
+            <li><p id="points-text" class="points-text">POINTS: 0</p></li>
+            <li><a href="balance.html"><button class="btn">BALANCE</button></a></li>
+        </ul>
+        <!-- Add a video element for webcam -->
+        <video id="webcam" autoplay></video>
+        <!-- Add text for random word -->
+        <p id="random-word">YOUR WORD IS ...</p>
+        <ul class="Snap-Button">
+            <p><button class="btn-snap" id="snap-button">SNAP</button></p>
+        </ul>
+    </div>
+
+    <script>
+        // Smooth scrolling when the down arrow is clicked
+        document.querySelector('.down-arrow').addEventListener('click', function(e) {
+            e.preventDefault();
+            // Scroll to the next section
+            document.querySelector('#next-section').scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+    
+        // Access the webcam and display the video
+        const webcam = document.getElementById('webcam');
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    webcam.srcObject = stream; // Set the webcam feed to the video element
+                })
+                .catch(function(error) {
+                    console.log('Error accessing webcam: ', error);
+                });
+        }
+    
+        // Initialize variables
+        const words = ["PLASTIC", "METAL", "GLASS", "CARDBOARD", "PAPER"];
+        let points = localStorage.getItem('points') ? parseInt(localStorage.getItem('points')) : 0; // Retrieve points from localStorage or set to 0 if not available
+    
+        // Display the points in the page (if applicable)
+        const pointsText = document.getElementById("points-text");
+        pointsText.innerText = `POINTS: ${points}`;
+    
+        // Function to generate a new random word
+        function generateRandomWord() {
+            return words[Math.floor(Math.random() * words.length)];
+        }
+    
+        // Set initial word
+        let randomWord = generateRandomWord();
+        document.getElementById("random-word").innerText = `YOUR WORD IS ${randomWord}`;
+    
+        // Handle SNAP button click
+        const snapButton = document.getElementById("snap-button");
+    
+        snapButton.addEventListener("click", async function() {
+            // Create a canvas to capture the webcam image
+            const canvas = document.createElement("canvas");
+            canvas.width = 224;
+            canvas.height = 224;
+            const context = canvas.getContext("2d");
+    
+            // Draw the current webcam frame to the canvas
+            context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+    
+            // Convert the canvas image to Blob
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg"));
+    
+            // Send the image to the Flask server
+            const formData = new FormData();
+            formData.append("image", blob, "capture.jpg");
+    
+            fetch("http://127.0.0.1:5000/predict", { // Update with your Flask server URL
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error("Error:", data.error);
+                    return;
+                }
+    
+                const { class: predictedClass, certainty } = data;
+    
+                // Check if the predicted class matches the random word
+                if (predictedClass.toUpperCase() === randomWord) {
+                    points += 1; // Increment points if matched
+                    pointsText.innerText = `POINTS: ${points}`;
+    
+                    // Save points to localStorage
+                    localStorage.setItem('points', points);
+    
+                    // Generate a new random word
+                    randomWord = generateRandomWord();
+                    document.getElementById("random-word").innerText = `YOUR WORD IS ${randomWord}`;
+                    alert(`You got a Point! Predicted: ${predictedClass}, Certainty: ${certainty.toFixed(2)}%`);
+                } else {
+                    alert(`No match! Predicted: ${predictedClass}, Certainty: ${certainty.toFixed(2)}%`);
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
+        });
+    
+        // Update STORE button link dynamically with points
+        const storeLink = document.getElementById("store-link");
+        storeLink.href = `store.html?points=${points}`;
+    </script>
+    
+    
+</body>
+</html>
